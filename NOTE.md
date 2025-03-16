@@ -34,13 +34,13 @@
 我们就分别按照这5个库所对应的源代码就进行阅读。首先他不是一个可执行的工具，他是一个库代码，所以没有 main 函数，只会有函数暴露出来给人调用。
 
 ## libmuduo_base.a
-TODO：
+线程的包装，线程安全的包装，日期，异常，文件访问， Filelog StreamLog， Mutex，进程的包装，时区的包装，weakCallback 和 Types是在 type_cast 的时候的逻辑。
 
 ## libmuduo_net.a
-TODO：网络部分，包括TCP
+网络部分，包括TCP,很多很详细的封装。包括 创建了 acceptor channel，eventloop socket, tcpconnection, tcpclient, tcpserver, timer ,poller,  timerqueue, zlibstream 这些对象, EventLoop 是最重要的。整合了 protocol buff，包装了 Linux 下面才有的 poll 和 epoll
 
 ## libmuduo_http.a
-TODO：
+基于 libmuduo_net.a 中实现的基本函数做了一个上层协议的封装，HTTP 协议的实现，包括 request， response， 每个请求和响应的 header 和 body，不同的content-type 对应的逻辑，包括 stream 的操作
 
 
 ## libmuduo_inspect.a
@@ -151,6 +151,9 @@ connectionCallback_: this is a callback function while accept an new connection 
 messageCallback_: this is a callback function while received a new message
 nextConnId: TODO:  
 ```
+
+## Acceptor
+
 当服务器调用acceptor setNewConnectionCallback()函数的时候会传入 newConnection，这是对的，因为在 accept 一个连接的时候，会给 TcpServer传回两个参数一个是客户端的连接 fd， 一个是客户端的地址。另外 server 端的 socket 是在 Acceptor 对象构造的时候利用传入的 listenAddr 创建的。
 ```CPP
 Acceptor::Acceptor(EventLoop* loop, const InetAddress& listenAddr, bool reuseport)
@@ -170,11 +173,12 @@ Acceptor::Acceptor(EventLoop* loop, const InetAddress& listenAddr, bool reusepor
 ```
 同时在创建 Acceptor 的时候，还会创建 acceptChannel，这是什么接下来会分析。
 
+## Socket
 让我们再来看看 Socket 创建的步骤是怎样的：
 ```CPP
 int sockets::createNonblockingOrDie(sa_family_t family)
 {
-#if VALGRIND
+#if VALGRIND //这里是在做内存检测的一个宏定义
   int sockfd = ::socket(family, SOCK_STREAM, IPPROTO_TCP);
   if (sockfd < 0)
   {
@@ -183,6 +187,22 @@ int sockets::createNonblockingOrDie(sa_family_t family)
 
   setNonBlockAndCloseOnExec(sockfd);
 #else
+  /*
+  这里解释一下 参数：
+    SOCK_STREAM 字节流，
+    SOCK_NONBLOCK 非阻塞， 
+    SOCK_CLOEXEC 子进程无法使用， 
+
+    IPPROTO_TCP 值是 6 指明了用 TCP
+    IPPROTO_UDP  值是 17，
+    IPPROTO_ICMP  值是 1
+    IPPROTO_RAW 允许我们去控制 IP 层
+
+    如果用TCP 也可以用 0 但是为什么 0 就是 TCP，是因为前面的 SOCK_STREAM 字段只有 TCP 支持， UDP 就是 SOCK_DGRAM
+    也就是说：
+    ::socket(family, SOCK_STREAM | SOCK_NONBLOCK | SOCK_CLOEXEC, 0) //自动选择，因为前面是 STREAM，所以就是 TCP
+    ::socket(family, SOCK_DGRAM ｜ SOCK_CLOEXEC, 0) //他会自动选择 因为前面是DGRAM，就会是 UDP
+  */
   int sockfd = ::socket(family, SOCK_STREAM | SOCK_NONBLOCK | SOCK_CLOEXEC, IPPROTO_TCP);
   if (sockfd < 0)
   {
@@ -192,4 +212,12 @@ int sockets::createNonblockingOrDie(sa_family_t family)
   return sockfd;
 }
 ```
-在这里创建的socket 是一个 NONBLOCK 的，并且SOCK_CLOEXEC，这个的含义是，如果这个进程创建子进程的时候，这个 Socket fd 在子进程中是无法使用的。在多线程的程序中要注意
+在这里创建的socket 是一个 NONBLOCK 的，并且SOCK_CLOEXEC，这个的含义是，如果这个进程创建子进程的时候，这个 Socket fd 在子进程中是无法使用的。这代码非常工整啊。
+
+另外他在代码中存在一个模块：SocketsOps.h/cc 这里面定义的全部都是跟 socket 相关的独立函数，不是类，全部放在 muduo::net::sockets 这个命名空间中。这是最基础的函数，包括 connect bind listen accept read readv write
+close，这里才是最核心的部分，从现在来看，也就是他对所有的 socket 相关的东西全部做了一次封装。
+另外他好像没有对 UDP 协议的发送回传做封装，不知道是我理解错误还是不太懂。TODO:
+
+
+
+

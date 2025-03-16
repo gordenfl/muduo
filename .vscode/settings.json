@@ -2,6 +2,7 @@
     "cSpell.words": [
         "CLOEXEC",
         "Demultiplexer",
+        "DGRAM",
         "epoll",
         "getpid",
         "IPPROTO",

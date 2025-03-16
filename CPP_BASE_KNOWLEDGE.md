@@ -34,7 +34,7 @@ connection->send("AAAAAA");
 ```
 不需要后面去delete 这个指针。他有引用技术和自动回收功能。就跟用 Python 的变量一样了
 
-## typedef std::function<void()> EventCallback;
+## <strong style="color:red;">typedef std::function<void()> EventCallback;</strong>
 定义一个函数指针，这个函数指针的函数类型是 void XXX()  类似这样的函数
 ```CPP
 typedef std::function<void()> EventCallback;
@@ -64,3 +64,16 @@ protected:
 };
 ```
 继承这个类的话既不能被拷贝也不能被赋值。
+
+## <strong style="color:red;">  std::move(void*);</strong>
+这个函数的参数可以是任何东西的指针，他的作用就是将 cb 直接移动到对应的位置上去比如：
+```CPP
+void setWriteCallback(EventCallback cb) {//EventCallback 类型是一个智能指针，所以 cb 就是一个指针
+  writeCallback_ = std::move(cb); //这个跟传引用差不多，但是放在 lambda 还有类的成员函数上是不可以传引用的
+}
+```
+std::function<void()> + std::move： 支持 lambda，支持成员函数，有可能会拷贝，性能方面设计动态非配， 灵活性高
+void (&cb)() （函数指针引用）：不支持 Lambda，不支持类的成员函数，无拷贝，性能最高，灵活性差
+
+
+
