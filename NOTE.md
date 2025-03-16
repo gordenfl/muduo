@@ -37,7 +37,7 @@
 TODO：
 
 ## libmuduo_net.a
-TODO：
+TODO：网络部分，包括TCP
 
 ## libmuduo_http.a
 TODO：
@@ -53,3 +53,143 @@ TODO：
 
 ## Examples 代码的分析
 这里举一两个有代表性的例子，看一下具体每一个 lib 是如何被调用他们的关系如何。
+
+
+---------------------------------
+## 项目的基本结构
+1. 基础结构
+	•	muduo/base/ 目录包含基础工具类，例如日志 (Logging)、时间戳 (Timestamp)、线程 (Thread)、原子操作 (Atomic) 等。
+	•	muduo/net/ 目录是核心，封装了网络通信相关的组件。
+
+2. 事件循环（Event Loop）
+	•	muduo/net/EventLoop.h / EventLoop.cc
+	•	事件循环的核心类，封装了 epoll_wait，并负责执行定时任务、I/O 事件处理等。
+	•	muduo/net/Poller.h / EPollPoller.h
+	•	Poller 是一个抽象类，EPollPoller 是具体实现，封装了 epoll 相关的操作，如 epoll_ctl。
+
+3. Channel（事件通道）
+	•	muduo/net/Channel.h / Channel.cc
+	•	Channel 绑定一个 file descriptor（通常是 socket），并在事件发生时调用回调函数。
+
+4. Acceptor（监听连接）
+	•	muduo/net/Acceptor.h / Acceptor.cc
+	•	负责监听新连接，内部使用 Socket 和 Channel 处理 accept 事件。
+
+5. TcpConnection（TCP 连接管理）
+	•	muduo/net/TcpConnection.h / TcpConnection.cc
+	•	维护单个 TCP 连接，封装 read/write 操作，管理读写缓冲区。
+
+6. TcpServer（服务器）
+	•	muduo/net/TcpServer.h / TcpServer.cc
+	•	负责管理多个 TcpConnection，支持多线程 EventLoop 运行。
+
+7. TcpClient（客户端）
+	•	muduo/net/TcpClient.h / TcpClient.cc
+	•	提供一个简单的 TCP 客户端封装。
+
+## EventLoop 基础
+在 muduo/net/EventLoop.h/cc 
+单独看这个模块有点迷茫，因为不知道从何入手，应该找寻一个 Example 里面的例子，我就找了 example/simple/echo 这个例子：
+```C++
+  LOG_INFO << "pid = " << getpid();
+  muduo::net::EventLoop loop;
+  muduo::net::InetAddress listenAddr(2007);
+  EchoServer server(&loop, listenAddr);
+  loop.loop();  
+
+```
+这里很容易懂，就是创建一个 loop 对象一个 listenAddress 自己就可以开始使用这两个对象了，让我们进去 server 的构造和loop
+这个了EchoServer 类中用到了一个 TcpServer 对象
+```CPP
+muduo::net::TcpServer server_;
+```
+初始化只需要一个 loop 指针，listenAddr引用，在给他一个字符串名字，初始化好了，然后 server 就可以setConnectionCallback， setMessageCallBack 两个函数，简单吧。
+
+```CPP
+ //这个参数类型const muduo::net::TcpConnectionPtr&
+server_.setConnectionCallback(std::bind(&EchoServer::onConnection, this, _1));
+/*
+这三个参数分别是：
+const muduo::net::TcpConnectionPtr&
+muduo::net::Buffer*
+muduo::Timestamp 
+*/
+server_.setMessageCallback(std::bind(&EchoServer::onMessage, this, _1, _2, _3));
+```
+就是说明我们可以通过这个设置钩子函数的情况来分开具体操作逻辑和底层的收发包的逻辑。🐂🍺
+
+具体 server_ 内部是怎样的，我们走进去看看：
+
+## TcpServer
+首先初始化：
+```CPP
+TcpServer::TcpServer(EventLoop* loop,
+                     const InetAddress& listenAddr,
+                     const string& nameArg,
+                     Option option)
+  : loop_(CHECK_NOTNULL(loop)),
+    ipPort_(listenAddr.toIpPort()),
+    name_(nameArg),
+    acceptor_(new Acceptor(loop, listenAddr, option == kReusePort)),
+    threadPool_(new EventLoopThreadPool(loop, name_)),
+    connectionCallback_(defaultConnectionCallback),
+    messageCallback_(defaultMessageCallback),
+    nextConnId_(1)
+{
+  acceptor_->setNewConnectionCallback(
+      std::bind(&TcpServer::newConnection, this, _1, _2));
+}
+```
+可以看到他的内部存储了几个关键的对象来帮助处理连接发送，接收数据需要用到的东西。
+```
+loop_ : 我们所说的 EventLoop 对象，接下来分析他内部是怎么运作的
+ipPort: 端口，是从传入的 listenAddr 里面提取的
+name_: is name of this instance
+acceptor_: is an Acceptor instance created by the loop, listenAddr  etc.
+threadPool_: Here is an thread Pool with the type of EventLoopThreadPool. We need to analysis it later
+connectionCallback_: this is a callback function while accept an new connection will be called
+messageCallback_: this is a callback function while received a new message
+nextConnId: TODO:  
+```
+当服务器调用acceptor setNewConnectionCallback()函数的时候会传入 newConnection，这是对的，因为在 accept 一个连接的时候，会给 TcpServer传回两个参数一个是客户端的连接 fd， 一个是客户端的地址。另外 server 端的 socket 是在 Acceptor 对象构造的时候利用传入的 listenAddr 创建的。
+```CPP
+Acceptor::Acceptor(EventLoop* loop, const InetAddress& listenAddr, bool reuseport)
+  : loop_(loop),
+    acceptSocket_(sockets::createNonblockingOrDie(listenAddr.family())), //<--- 在这里
+    acceptChannel_(loop, acceptSocket_.fd()), // <----TODO: 分析
+    listening_(false),
+    idleFd_(::open("/dev/null", O_RDONLY | O_CLOEXEC))
+{
+  assert(idleFd_ >= 0);
+  acceptSocket_.setReuseAddr(true);
+  acceptSocket_.setReusePort(reuseport);
+  acceptSocket_.bindAddress(listenAddr);
+  acceptChannel_.setReadCallback(
+      std::bind(&Acceptor::handleRead, this));
+}
+```
+同时在创建 Acceptor 的时候，还会创建 acceptChannel，这是什么接下来会分析。
+
+让我们再来看看 Socket 创建的步骤是怎样的：
+```CPP
+int sockets::createNonblockingOrDie(sa_family_t family)
+{
+#if VALGRIND
+  int sockfd = ::socket(family, SOCK_STREAM, IPPROTO_TCP);
+  if (sockfd < 0)
+  {
+    LOG_SYSFATAL << "sockets::createNonblockingOrDie";
+  }
+
+  setNonBlockAndCloseOnExec(sockfd);
+#else
+  int sockfd = ::socket(family, SOCK_STREAM | SOCK_NONBLOCK | SOCK_CLOEXEC, IPPROTO_TCP);
+  if (sockfd < 0)
+  {
+    LOG_SYSFATAL << "sockets::createNonblockingOrDie";
+  }
+#endif
+  return sockfd;
+}
+```
+在这里创建的socket 是一个 NONBLOCK 的，并且SOCK_CLOEXEC，这个的含义是，如果这个进程创建子进程的时候，这个 Socket fd 在子进程中是无法使用的。在多线程的程序中要注意
