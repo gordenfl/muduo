@@ -1,6 +1,21 @@
 {
     "cSpell.words": [
+        "CLOEXEC",
+        "Demultiplexer",
+        "epoll",
+        "getpid",
+        "IPPROTO",
+        "libmuduo",
         "muduo",
-        "noncopyable"
+        "NONBLOCK",
+        "Nonblocking",
+        "noncopyable",
+        "NOTNULL",
+        "Proactor",
+        "RDONLY",
+        "reuseport",
+        "sockfd",
+        "SYSFATAL",
+        "VALGRIND"
     ]
 }

@@ -64,5 +64,3 @@ protected:
 };
 ```
 继承这个类的话既不能被拷贝也不能被赋值。
-
-## <strong style="color:red;">  class Channel : noncopyable {};</strong>
