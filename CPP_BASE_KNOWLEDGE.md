@@ -128,6 +128,20 @@ void hello() {
 ```
 这样你就可以调用 a() 了； 两者是不一样的。
 
+## using 在新版C++中的含义
+```CPP
+//typedef std::function<void(int a, int b)> ADD; //这句和下面一句话是等同的
+using ADD std::function<void(int a, int b)>;
 
+int add(int num1, int num2) {
+  return num1+num2;
+}
+int main() {
+  ADD func = add;
+  cout << func(1,3) << endl;
+}
+
+```
+上面个两句话是等同的
 
 

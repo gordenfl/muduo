@@ -3,6 +3,7 @@
         "CLOEXEC",
         "Demultiplexer",
         "DGRAM",
+        "endl",
         "epoll",
         "getpid",
         "IPPROTO",
