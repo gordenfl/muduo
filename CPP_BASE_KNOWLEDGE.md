@@ -19,7 +19,7 @@ std::bind(func, _2, _1);
 ```
 绑定智能指针：
 ```CPP
-std::bind(&Class::method, shared_ptr, _1);
+std::bind(&Class::method, shared_ptr, _1); //他的返回值是一个 void()类型的
 ```
 替代方案： 
 ```CPP
@@ -75,7 +75,7 @@ void setWriteCallback(EventCallback cb) {//EventCallback 类型是一个智能�
 std::function<void()> + std::move： 支持 lambda，支持成员函数，有可能会拷贝，性能方面设计动态非配， 灵活性高
 void (&cb)() （函数指针引用）：不支持 Lambda，不支持类的成员函数，无拷贝，性能最高，灵活性差
 
-## explicit 关键字在 C++ 构造函数中的应用
+## <strong style="color:red;"> explicit 关键字在 C++ 构造函数中的应用</strong>
 这个关键字就是属于，避免在 C++类中，有且只有一个参数的构造函数被隐式转换
 ```CPP
 class A {
@@ -91,7 +91,7 @@ void main() {
 }
 ```
 
-## std::unique_ptr<> 的含义
+## <strong style="color:red;">  std::unique_ptr<> 的含义</strong>
 创建尖括号中的类型只能用自己的这个名字来访问不能赋值给别人
 ```CPP
 std::unique_ptr<A> p1 = std::make_unique<A>();
@@ -101,7 +101,7 @@ std::unique_ptr<A> p1 = std::make_unique<A>();
 std::unique_ptr<A> p2 = std::move(p1);  // ✅ p1 的所有权转移到 p2， 当 p1 的所有权转移到 p2 之后，p1 变为空，不能再访问原对象。
 ```
 
-##  std::deque
+##  <strong style="color:red;"> std::deque</strong>
 类似 std::vector, 它可以从头不和尾部增加值，和 pop 值， python 中 list
 ```CPP
 std::deque<int> dq;
@@ -113,3 +113,21 @@ std::deque<int> dq;
     dq.pop_front();   // 删除头部
     dq.pop_back();    // 删除尾部
 ```
+
+
+## <strong style="color:red;"> typedef std::function<void ()> Task </strong>
+typedef void(void) Task
+本来没看懂这是什么意思，表达定义个函数 参数为空，返回值为空的函数指针，名字叫 Task
+这个名字叫 Task 的类型可以创造实例，并且指向一个返回值 void，没有参数的函数，
+也可以创造一个实例并且指向 一个 lambda，某个类的成员函数。这个比过去的函数指针要方便很多，过去的函数指针类型定义是 void (*a)();
+可以用 void(*a)() = hello
+```CPP
+void hello() {
+  printf("Hello WOrld\n");
+}
+```
+这样你就可以调用 a() 了； 两者是不一样的。
+
+
+
+

@@ -44,48 +44,64 @@
 
 
 ## libmuduo_inspect.a
-TODO：
+提供的一个 轻量级 HTTP 服务器，用于运行时调试和状态监控。
+* Inspector（核心类）：处理 HTTP 请求，返回服务器状态信息。
+*	ProcessInspector：查看进程状态，如 CPU、内存、进程 ID 等。
+*	PerformanceInspector：查看性能数据，如定时器、日志等。
+*	SystemInspector：获取系统相关信息，如负载、线程等。
 
+提供一个模块，可以启动一个 HTTP 服务器去观看这些信息。
 
 ## libmuduo_pubsub.a
-TODO：
+是 Muduo 提供的一个轻量级的发布-订阅（Pub/Sub）库，用于构建基于 TCP 的发布-订阅消息系统。
 
 
 ## Examples 代码的分析
 这里举一两个有代表性的例子，看一下具体每一个 lib 是如何被调用他们的关系如何。
 
+主要功能是：
+*	允许多个客户端通过 TCP 连接到服务器，进行消息的发布和订阅。
+*	基于 Muduo 网络库，采用事件驱动的方式处理 Pub/Sub 逻辑。
+*	提供了简单的主题（Topic）管理机制，可以让多个客户端订阅相同的主题，并接收推送的消息。
 
----------------------------------
+源代码位置在 muduo/examples/pubsub/  我就是说在 example 外面找不到这个玩意儿
+
+muduo_pubsub 的应用场景
+* 实时消息推送（如聊天室、股票行情、日志收集）
+* 轻量级的分布式事件总线
+* 多人协作应用（如在线文档编辑）
+
+---
 ## 项目的基本结构
 1. 基础结构
-	•	muduo/base/ 目录包含基础工具类，例如日志 (Logging)、时间戳 (Timestamp)、线程 (Thread)、原子操作 (Atomic) 等。
-	•	muduo/net/ 目录是核心，封装了网络通信相关的组件。
+*	muduo/base/ 目录包含基础工具类，例如日志 (Logging)、时间戳 (Timestamp)、线程 (Thread)、原子操作 (Atomic) 等。
+*	muduo/net/ 目录是核心，封装了网络通信相关的组件。
 
 2. 事件循环（Event Loop）
-	•	muduo/net/EventLoop.h / EventLoop.cc
-	•	事件循环的核心类，封装了 epoll_wait，并负责执行定时任务、I/O 事件处理等。
-	•	muduo/net/Poller.h / EPollPoller.h
-	•	Poller 是一个抽象类，EPollPoller 是具体实现，封装了 epoll 相关的操作，如 epoll_ctl。
+*	muduo/net/EventLoop.h / EventLoop.cc
+*	事件循环的核心类，封装了 epoll_wait，并负责执行定时任务、I/O 事件处理等。
+*	muduo/net/Poller.h / EPollPoller.h
+*	Poller 是一个抽象类，EPollPoller 是具体实现，封装了 epoll 相关的操作，如 epoll_ctl。
 
 3. Channel（事件通道）
-	•	muduo/net/Channel.h / Channel.cc
-	•	Channel 绑定一个 file descriptor（通常是 socket），并在事件发生时调用回调函数。
+*	muduo/net/Channel.h / Channel.cc
+*	Channel 绑定一个 file descriptor（通常是 socket），并在事件发生时调用回调函数。
 
 4. Acceptor（监听连接）
-	•	muduo/net/Acceptor.h / Acceptor.cc
-	•	负责监听新连接，内部使用 Socket 和 Channel 处理 accept 事件。
+*	muduo/net/Acceptor.h / Acceptor.cc
+*	负责监听新连接，内部使用 Socket 和 Channel 处理 accept 事件。
 
 5. TcpConnection（TCP 连接管理）
-	•	muduo/net/TcpConnection.h / TcpConnection.cc
-	•	维护单个 TCP 连接，封装 read/write 操作，管理读写缓冲区。
+*	muduo/net/TcpConnection.h / TcpConnection.cc
+*	维护单个 TCP 连接，封装 read/write 操作，管理读写缓冲区。
 
 6. TcpServer（服务器）
-	•	muduo/net/TcpServer.h / TcpServer.cc
-	•	负责管理多个 TcpConnection，支持多线程 EventLoop 运行。
+*	muduo/net/TcpServer.h / TcpServer.cc
+*	负责管理多个 TcpConnection，支持多线程 EventLoop 运行。
 
 7. TcpClient（客户端）
-	•	muduo/net/TcpClient.h / TcpClient.cc
-	•	提供一个简单的 TCP 客户端封装。
+*	muduo/net/TcpClient.h / TcpClient.cc
+*	提供一个简单的 TCP 客户端封装。
 
 ## EventLoop 和 Channel 基础
 在 muduo/net/EventLoop.h/cc 
@@ -264,9 +280,26 @@ sleep_for() //让线程休眠
 sleep_until() //休眠到具体的某特时间点
 ```
 
-## ThreadPool
+## ThreadPool  牛逼
 管理多个线程的池子，在这里面我看到了很多信息，这里主要分析一下 Thread，在 ThreadPool 中有容量，maxQueueSize_，可以 set 用这个函数 setMaxQueueSize，
-就是将所有线程预先创建好，然放在 vector 里面，
+就是将所有线程预先创建好，然放在 vector 里面， 这个类里面主要的函数是：
+```CPP
+void start(int numThreads); //开始创建整个 ThreadPool
+void stop(); //停止这个 ThreadPoll，并且回收资源等等
+void run(Task f); //这个是核心，就是用一个线程去跑 f 说指向的函数，函数在外面传进来的时候有个的是
+thread_poll_.run(::bind(&func, arg1, arg2)); //这就会调用 run，去启动个线程，在线程里面执行 func(arg1, arg2)
+```
+
+## protobuf
+TODO:
+
+## protorpc
+TODO:
+
+
+
+
+
 
 
 
