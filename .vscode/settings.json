@@ -18,5 +18,8 @@
         "sockfd",
         "SYSFATAL",
         "VALGRIND"
-    ]
+    ],
+    "files.associations": {
+        "vector": "cpp"
+    }
 }
