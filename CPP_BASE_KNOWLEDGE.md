@@ -25,9 +25,35 @@ std::bind(&Class::method, shared_ptr, _1); //他的返回值是一个 void()类�
 ```CPP
 lambda
 ```
+非常要注意的是，bind 的时候说传入的值，就是以后在调用这个函数时候的值：
+ ```CPP
+#include <iostream>
+#include <functional>
+
+class Curl {
+public:
+    void onWrite(int fd) {
+        std::cout << "Writing on fd: " << fd << std::endl;
+    }
+};
+
+int main() {//整个函数将输出的值是 10 而不是二十
+    Curl curl;
+    int fd = 10;
+
+    auto callback = std::bind(&Curl::onWrite, &curl, fd); // 绑定时拷贝 fd = 10，这是所使用的是 fd 的值而不是定义一个变量
+    fd = 20;  // 修改 fd 的值
+
+    callback(); // 调用时仍然使用 bind 时的 fd = 10
+
+    return 0;
+}
+```
+所以不需要 callback 连的逻辑往外面传值。
 
 ## <strong style="color:red;"> std::share_ptr<str>   </strong>
-智能指针，你传递一个类进去以后，他会给你创建这个类的实例并且返回指向这个类的智能指针，你不需要去管这个类的对象什么时候析构
+智能指针，你传递一个类进去以后，他会给你创建这个类的实例并且返回指向这个类的智能指针，你不需要去管这个类的对象什么时候析构。
+
 ```CPP
 std::share_prt<TcpConnection> connection;
 connection->send("AAAAAA");
@@ -144,4 +170,47 @@ int main() {
 ```
 上面个两句话是等同的
 
+## class A: public std::enable_shared_from_this<A> {};
+这个enable_shared_from_this是一个 STL 的标准库提供的辅助函数
+辅助什么呢？他允许对象安全的创建 share_ptr 共享实例。就是保证在类的成员函数中可以获取 对自己的share_ptr指针：
+```CPP
+class A : public std::enable_shared_form_this<A> {
+public: 
+  void func1() {
+    std::shared_ptr<A> self = shared_from_this(); //这个函数是enable_shared_form_this 提供的
+    cout << "this object be used by:" << self.use_count() << endl; //这里获取的是 this 这个对象被多少地方使用
+  }
 
+  static std::shared_ptr<A> create() {
+    return std::shared_ptr<A>(new A());
+  }
+private:
+  A() = default;
+};
+
+//类的外面来调用：
+std::shared_ptr<A> a = A::create();
+a->func1(); //这里就可以获得自己被引用了几次，为了防备在类的内部被自己内部的逻辑 delete 掉
+```
+
+## size_t vs ssize_t
+size_t 是一个无符号的整数，unsigned int 4个字节
+ssize_t 是一个有符号的整数， 就是一个 int 4 个字节
+
+## std::string 的使用
+在 C++ std 中的 string，在创建的是后有固定的 memory， 向 string增加的数据超过这个memory 的数量的时候，就会产生新的 string 对象，C++会将旧的 string 内容 copy 到新的值上，然后加上新的 string 值。
+新申请的内容大小不同的编译器不一样：
+GCC Clang 会申请 1.5 或者 2 倍的原来值的大小
+MSVC 会直接申请 2 倍大小
+
+```CPP
+int main() {
+    std::string s;
+    for (int i = 0; i < 50; ++i) {
+        std::cout << "Capacity before append: " << s.capacity() << std::endl;
+        s.append("A");
+        std::cout << "Capacity after append: " << s.capacity() << "\n\n";
+    }
+}
+```
+这就知道了。
