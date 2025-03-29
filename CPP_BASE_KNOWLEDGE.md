@@ -1,4 +1,4 @@
-#  现代C++ 的基本知识
+#  现代C++ 的基本知识 C++20 C++21
 
 ## <strong style="color: red;"> std::bind </strong>
 
@@ -60,6 +60,16 @@ connection->send("AAAAAA");
 ```
 不需要后面去delete 这个指针。他有引用技术和自动回收功能。就跟用 Python 的变量一样了
 
+## <strong style="color:red;">  std::unique_ptr<> 的含义</strong>
+创建尖括号中的类型只能用自己的这个名字来访问不能赋值给别人
+```CPP
+std::unique_ptr<A> p1 = std::make_unique<A>();
+std::unique_ptr<A> p2 = p1;  // ❌ 编译错误！不能复制 unique_ptr
+
+std::unique_ptr<A> p1 = std::make_unique<A>();
+std::unique_ptr<A> p2 = std::move(p1);  // ✅ p1 的所有权转移到 p2， 当 p1 的所有权转移到 p2 之后，p1 变为空，不能再访问原对象。
+```
+
 ## <strong style="color:red;">typedef std::function<void()> EventCallback;</strong>
 定义一个函数指针，这个函数指针的函数类型是 void XXX()  类似这样的函数
 ```CPP
@@ -117,15 +127,7 @@ void main() {
 }
 ```
 
-## <strong style="color:red;">  std::unique_ptr<> 的含义</strong>
-创建尖括号中的类型只能用自己的这个名字来访问不能赋值给别人
-```CPP
-std::unique_ptr<A> p1 = std::make_unique<A>();
-std::unique_ptr<A> p2 = p1;  // ❌ 编译错误！不能复制 unique_ptr
 
-std::unique_ptr<A> p1 = std::make_unique<A>();
-std::unique_ptr<A> p2 = std::move(p1);  // ✅ p1 的所有权转移到 p2， 当 p1 的所有权转移到 p2 之后，p1 变为空，不能再访问原对象。
-```
 
 ##  <strong style="color:red;"> std::deque</strong>
 类似 std::vector, 它可以从头不和尾部增加值，和 pop 值， python 中 list
@@ -154,7 +156,8 @@ void hello() {
 ```
 这样你就可以调用 a() 了； 两者是不一样的。
 
-## using 在新版C++中的含义
+
+## <strong style="color:red;">  using 在新版C++中的含义 </strong>
 ```CPP
 //typedef std::function<void(int a, int b)> ADD; //这句和下面一句话是等同的
 using ADD std::function<void(int a, int b)>;
@@ -170,7 +173,7 @@ int main() {
 ```
 上面个两句话是等同的
 
-## class A: public std::enable_shared_from_this<A> {};
+## <strong style="color:red;">  class A: public std::enable_shared_from_this \<A\> {};</strong>
 这个enable_shared_from_this是一个 STL 的标准库提供的辅助函数
 辅助什么呢？他允许对象安全的创建 share_ptr 共享实例。就是保证在类的成员函数中可以获取 对自己的share_ptr指针：
 ```CPP
@@ -182,7 +185,7 @@ public:
   }
 
   static std::shared_ptr<A> create() {
-    return std::shared_ptr<A>(new A());
+    return std::make_shared<A>();
   }
 private:
   A() = default;
@@ -193,11 +196,11 @@ std::shared_ptr<A> a = A::create();
 a->func1(); //这里就可以获得自己被引用了几次，为了防备在类的内部被自己内部的逻辑 delete 掉
 ```
 
-## size_t vs ssize_t
+## <strong style="color:red;">  size_t vs ssize_t </strong>
 size_t 是一个无符号的整数，unsigned int 4个字节
 ssize_t 是一个有符号的整数， 就是一个 int 4 个字节
 
-## std::string 的使用
+## <strong style="color:red;">  std::string 的使用 </strong>
 在 C++ std 中的 string，在创建的是后有固定的 memory， 向 string增加的数据超过这个memory 的数量的时候，就会产生新的 string 对象，C++会将旧的 string 内容 copy 到新的值上，然后加上新的 string 值。
 新申请的内容大小不同的编译器不一样：
 GCC Clang 会申请 1.5 或者 2 倍的原来值的大小
